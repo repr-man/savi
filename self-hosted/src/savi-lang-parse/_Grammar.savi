@@ -58,9 +58,8 @@
 
     // Define what a string looks like.
     string_char = (
-      @str("\\'") / @str("\\\"") / @str("\\\\") /
-      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") /
-      @str("\b")  / @str("\f")  / @str("\n")  / @str("\r")  / @str("\t") /
+      @str("\\'") / @str("\\\"") / @str("\\\\") / @str("\\0") /
+      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") / @str("\\v") /
       (@str("\\x") >> digithex >> digithex) /
       (@str("\\u") >> digithex >> digithex >> digithex >> digithex) /
       (@str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -81,9 +80,8 @@
 
     // Define what a character string looks like.
     character_char =
-      @str("\\'") / @str("\\\"") / @str("\\\\") /
-      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") /
-      @str("\b")  / @str("\f")  / @str("\n")  / @str("\r")  / @str("\t") /
+      @str("\\'") / @str("\\\"") / @str("\\\\") / @str("\\0") /
+      @str("\\b") / @str("\\f") / @str("\\n") / @str("\\r") / @str("\\t") / @str("\\v") /
       (@str("\\x") >> digithex >> digithex) /
       (@str("\\u") >> digithex >> digithex >> digithex >> digithex) /
       (@str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -92,16 +90,16 @@
     character =
       @char('\'') >> character_char.repeat.token(_Token.Character) >> @char('\'')
 
-    // Define what a heredoc string looks like.
-    heredoc_content = @declare
-    heredoc = @str("<<<") >> heredoc_content.token(_Token.HereDoc) >> @str(">>>")
-    heredoc_no_token = @str("<<<") >> heredoc_content >> @str(">>>")
-    heredoc_content.define(
-      (heredoc_no_token / (@str(">>>").not >> @any)).repeat
+    // Define what a nestable bracket string looks like.
+    bracket_string_content = @declare
+    bracket_string = @str("<<<") >> bracket_string_content.token(_Token.BracketString) >> @str(">>>")
+    bracket_string_no_token = @str("<<<") >> bracket_string_content >> @str(">>>")
+    bracket_string_content.define(
+      (bracket_string_no_token / (@str(">>>").not >> @any)).repeat
     )
 
     // Define an atom to be a single term with no binary operators.
-    anystring = string / character / heredoc
+    anystring = string / character / bracket_string
     atom = parens / anystring / float / integer / ident
 
     // Define a compound to be a closely bound chain of atoms.
@@ -133,23 +131,24 @@
       @str("===") / @str("==") / @str("!==") / @str("!=") /
       @str("=~")).token(_Token.Operator)
     op4 = (@str("&&") / @str("||")).token(_Token.Operator)
-    ope = (@str("+=") / @str("-=") / @str("<<=") / @char('=')).token(_Token.Operator)
+    ope = (@str("+=") / @str("-=") / @str("*=") / @str("/=") /
+      @str("<<=") / @char('=')).token(_Token.Operator)
     ope_colon = @char(':').token(_Token.Operator)
 
     // Construct the nested possible relations for each group of operators.
-    tw = compound
-    t1 = ((tw >> (opw >> s >> tw).repeat(1)).token(_Token.GroupWhitespace) >> s) / tw
+    t1 = compound
     t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).token(_Token.Relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).token(_Token.Relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).token(_Token.Relate)
     te = (t4 >> (sn >> op4 >> sn >> t4).repeat).token(_Token.Relate)
+    tw = ((te >> (opw >> s >> te).repeat(1)).token(_Token.GroupWhitespace) >> s) / te
     t = (
-      te >> (
+      tw >> (
         // Newlines cannot precede the colon form of `ope`,
         // but any other `ope` can be preceded by a newline.
-        s >> (ope_colon / (sn >> ope)) >> sn >> te
+        s >> (ope_colon / (sn >> ope)) >> sn >> tw
       ).repeat
-    ).token(_Token.RelateRight) >> s
+    ).token(_Token.RelateAssign) >> s
 
     // Define what a comma/newline-separated sequence of terms looks like.
     decl = @declare

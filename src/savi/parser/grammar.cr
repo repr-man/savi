@@ -51,8 +51,8 @@ module Savi::Parser
     # Define what a string looks like.
     string_char =
       str("\\'") | str("\\\"") | str("\\\\") |
-      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") | str("\\v") | str("\\0") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t")  | str("\v")  | str("\0") |
       (str("\\x") >> digithex >> digithex) |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -70,8 +70,8 @@ module Savi::Parser
     # Define what a character string looks like.
     character_char =
       str("\\'") | str("\\\"") | str("\\\\") |
-      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") |
-      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t") |
+      str("\\b") | str("\\f") | str("\\n") | str("\\r") | str("\\t") | str("\\v") | str("\\0") |
+      str("\b")  | str("\f")  | str("\n")  | str("\r")  | str("\t")  | str("\v")  | str("\0") |
       (str("\\x") >> digithex >> digithex) |
       (str("\\u") >> digithex >> digithex >> digithex >> digithex) |
       (str("\\U") >> digithex >> digithex >> digithex >> digithex >>
@@ -119,23 +119,24 @@ module Savi::Parser
             str("===") | str("==") | str("!==") | str("!=") |
             str("=~")).named(:op)
     op4 = (str("&&") | str("||")).named(:op)
-    ope = (str("+=") | str("-=") | str("<<=") | char('=')).named(:op)
+    ope = (str("+=") | str("-=") | str("*=") | str("/=") |
+            str("<<=") | char('=')).named(:op)
     ope_colon = char(':').named(:op)
 
     # Construct the nested possible relations for each group of operators.
-    tw = compound
-    t1 = ((tw >> (opw >> s >> tw).repeat(1)).named(:group_w) >> s) | tw
+    t1 = compound
     t2 = (t1 >> (sn >> op1 >> sn >> t1).repeat).named(:relate)
     t3 = (t2 >> (sn >> op2 >> sn >> t2).repeat).named(:relate)
     t4 = (t3 >> (sn >> op3 >> sn >> t3).repeat).named(:relate)
-    te = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
+    tw = (t4 >> (sn >> op4 >> sn >> t4).repeat).named(:relate)
+    te = ((tw >> (opw >> s >> tw).repeat(1)).named(:group_w) >> s) | tw
     t = (
       te >> (
         # Newlines cannot precede the colon form of `ope`,
         # but any other `ope` can be preceded by a newline.
         s >> (ope_colon | (sn >> ope)) >> sn >> te
       ).repeat
-    ).named(:relate_r) >> s
+    ).named(:relate_assign) >> s
 
     # Define what a comma/newline-separated sequence of terms looks like.
     decl = declare()

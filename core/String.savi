@@ -29,11 +29,11 @@
 
   :new ref (space USize = 0)
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new iso new_iso(space USize = 0) // TODO: use recover instead of this hack
     @_size = 0
-    if (space > 0) (@_ptr_allocate(space) | @_ptr_set_null)
+    if space > 0 (@_ptr_allocate(space) | @_ptr_set_null)
 
   :new val from_array(data Array(U8)'val)
     @_size = data.size
@@ -63,7 +63,7 @@
   :fun into_string_space: @space
 
   :fun into_string(out String'ref) None
-    if (@_size > 0) (
+    if @_size > 0 (
       new_size = out._size + @_size
       out.reserve(new_size)
       out._clone_from(@_ptr._unsafe_val, @_size, out._size)
@@ -123,8 +123,8 @@
     found Bool = False
     offset = start_offset
     other_first = other.byte_at!(0) // cache and error out if the other is empty
-    while (!found && offset < @_size) (
-      if (@_ptr._get_at(offset) == other_first) (
+    while !found && offset < @_size (
+      if @_ptr._get_at(offset) == other_first (
         found = (@_ptr._offset(offset)._compare(other._ptr, other._size) == 0)
       )
       offset = offset + 1
@@ -163,11 +163,11 @@
   :: The size (number of actual bytes present in the string) does not change.
 
   :fun ref reserve(space USize)
-    if (@_space < space) @_ptr_reallocate(space)
+    if @_space < space @_ptr_reallocate(space)
     @
 
   :fun byte_at!(index USize) U8
-    if (@size <= index) error!
+    if @size <= index error!
     @_ptr._get_at(index)
 
   :fun "[]!"(index): @char_at!(index)
@@ -177,7 +177,7 @@
   :: Returns 0xfffd (Unicode "Replacement Character") if the given byte index
   :: is not pointing to the start of a well-formed UTF-8-encoded codepoint.
   :fun char_at!(index USize) U32
-    if (@size <= index) error!
+    if @size <= index error!
 
     state = String.DecodeUTF8.State.new
     try (
@@ -201,7 +201,7 @@
     start = from
     finish = to.at_most(@size)
 
-    if (start < @_size && start < finish) (
+    if start < @_size && start < finish (
       @_slice(start, finish)
     |
       @val_from_cpointer(@_ptr._null, 0, 0)
@@ -211,7 +211,7 @@
     start = from
     finish = to.at_most(@size)
 
-    if (start < @_size && start < finish) (
+    if start < @_size && start < finish (
       @_size = finish - start
       @_ptr = @_ptr._offset(start)
     |
@@ -240,9 +240,23 @@
 
   :fun each_byte_with_index(from USize = 0, to = USize.max_value, stride USize = 1)
     index = from
-    while (index < to.at_most(@_size)) (
+    while index < to.at_most(@_size) (
       yield (@_ptr._get_at(index), index)
       index += stride
+    )
+    None
+
+  :fun reverse_each_byte_with_index(
+    from = USize.max_value
+    to USize = 0
+    stride USize = 1
+  )
+    try (
+      index USize = from.at_most(@_size) -! 1
+      while index >= to (
+        yield (@_ptr._get_at(index), index)
+        index = index.at_most(@_size) -! stride
+      )
     )
     None
 
@@ -267,7 +281,7 @@
     start_index = index
     state = String.DecodeUTF8.State.new
 
-    while (index < to.at_most(@_size)) (
+    while index < to.at_most(@_size) (
       byte = @_ptr._get_at(index)
       index = index + 1
 
@@ -310,7 +324,7 @@
     finish_index = index
     state = String.DecodeUTF8.ReverseState.new
 
-    while (index > 0) (
+    while index > 0 (
       index -= 1
       byte = @_ptr._get_at(index)
 
@@ -335,7 +349,7 @@
     @
 
   :fun ref "<<"(other String'box)
-    if (other._size > 0) (
+    if other._size > 0 (
       new_size = @_size + other._size
       if other.is_null_terminated (
         @reserve(new_size + 1)
@@ -356,7 +370,7 @@
     start = from
     finish = to.at_most(other.size)
 
-    if (start < other._size && start < finish) (
+    if start < other._size && start < finish (
       size = finish - start
       other._ptr._offset(start)._copy_to(@_ptr._offset(@_size), size)
       @_size += size
@@ -368,11 +382,11 @@
       @_size = @_size + byte_count
       @reserve(@_size)
       @_ptr._assign_at(i, byte_1)
-      if (byte_count > 1) (
+      if byte_count > 1 (
         @_ptr._assign_at(i + 1, byte_2)
-        if (byte_count > 2) (
+        if byte_count > 2 (
           @_ptr._assign_at(i + 2, byte_3)
-          if (byte_count > 3) (
+          if byte_count > 3 (
             @_ptr._assign_at(i + 3, byte_4)
           )
         )
@@ -382,11 +396,11 @@
 
   :: Return a new string consisting of the original string copied `n` times.
   :fun "*"(times USize)
-    if (times > 0) (
+    if times > 0 (
       ptr = @_ptr._alloc(@size * times)
       size USize = 0
 
-      while (times > 0) (times -= 1
+      while times > 0 (times -= 1
         @_ptr._copy_to(ptr._offset(size), @size)
         size += @size
       )
@@ -404,7 +418,7 @@
   :fun val each_split(split_byte U8) // TODO: a byte shouldn't be the only thing we can split by...
     :yields String
     start USize = 0
-    while (start < @_size) (
+    while start < @_size (
       try (
         split_pos = @_index_of!(split_byte, start)
         yield @_slice(start, split_pos)
@@ -423,8 +437,8 @@
   :: Returns the integer index of the first occurence of the given character `char`.
   :fun val _index_of!(char U8, offset USize = 0) USize
     idx = offset
-    while (idx < @_size) (
-      return idx if (@_ptr._get_at(idx) == char)
+    while idx < @_size (
+      return idx if @_ptr._get_at(idx) == char
       idx += 1
     )
     error!
@@ -438,7 +452,7 @@
     index USize = 0
     result = False
     try (
-      while (index < shared_size) (
+      while index < shared_size (
         a = @_ptr._get_at(index)
         b = other._ptr._get_at(index)
         case (
@@ -456,7 +470,7 @@
     index USize = 0
     result = False
     try (
-      while (index < shared_size) (
+      while index < shared_size (
         a = @_ptr._get_at(index)
         b = other._ptr._get_at(index)
         case (
@@ -483,10 +497,10 @@
     output * possible_negation
 
   :fun substring(from USize, to USize = 0) String'iso
-    if (to == 0 || to > @_size) (
+    if to == 0 || to > @_size (
       to = @_size
     )
-    if (from < to) (
+    if from < to (
       new_size = to - from
       new_alloc = new_size.next_pow2
       new_ptr = @_ptr._alloc(new_alloc)
@@ -496,13 +510,136 @@
       String.new_iso
     )
 
+  :: Replace every occurrence of the given `old` substring with the given `new`.
+  :: The existing string is modified in-place.
+  ::
+  :: No new internal buffer is allocated if the length of the `new` substring
+  :: is less than or equal to the length of the `old` substring.
+  :fun ref replace_all(old String'box, new String'box) @
+    // Get the offsets of all occurrences of the old string.
+    // TODO: It should be possible to avoid allocating this array (and lazily
+    // find each offset one at a time), at least in the particular cases
+    // where the `new` substring is equal or less than the `old` one.
+    // For now we keep it here just to keep things easier to read,
+    // but if somebody's hot path needed this to be faster we could try it.
+    offsets Array(USize) = []
+    try (
+      last_offset USize = 0
+      while True (
+        found_offset = @offset_of!(old, last_offset)
+        offsets << found_offset
+        last_offset = found_offset + old.size
+      )
+    )
+    return @ if offsets.is_empty
+
+    case (
+    | new.size == old.size |
+      // If the new string is the same size as the old string, we can
+      // just replace each occurrence of the old string with the new string.
+      // We don't need to move any surrounding chunks around.
+      if new.is_not_empty (
+        offsets.each -> (offset |
+          new._ptr._unsafe._copy_to(@_ptr._offset(offset), new.size)
+        )
+      )
+    | new.size < old.size |
+      // If the new string is shorter than the old string, we need to
+      // shift chunks toward the left, starting from the left side.
+      new_size_delta = new.size - old.size
+      offsets.each_with_index -> (source_offset, index |
+        // Compensate for the size difference between the old and new string.
+        offset_delta = new_size_delta * index
+        dest_offset = source_offset + offset_delta
+
+        // Replace (part of) the old string with the new string.
+        if new.is_not_empty (
+          new._ptr._unsafe._copy_to(@_ptr._offset(dest_offset), new.size)
+        )
+
+        // Shift the chunk to the left.
+        chunk_source_offset = source_offset + old.size
+        chunk_source_offset_final = try (offsets[index + 1]! | @_size)
+        chunk_size = chunk_source_offset_final - chunk_source_offset
+        if chunk_size.is_nonzero (
+          chunk_dest_offset = dest_offset + new.size
+          @_ptr._offset(chunk_source_offset)._unsafe._copy_to(
+            @_ptr._offset(chunk_dest_offset)
+            chunk_size
+          )
+        )
+      )
+      @_size += new_size_delta * offsets.size
+
+    | // Otherwise, we know that `new.size > old.size`.
+      // The overall string is going to get larger, so we need to reserve space.
+      new_size_delta = new.size - old.size
+      @reserve(@_size + new_size_delta * offsets.size)
+
+      // If the new string is longer than the old string, we need to
+      // shift the data to the right to make room for the new string, starting
+      // from the right side (so we don't overwrite data we haven't copied yet).
+      offsets.reverse_each_with_index -> (source_offset, index |
+        // Compensate for the size difference between the old and new string.
+        offset_delta = new_size_delta * index
+        dest_offset = source_offset + offset_delta
+
+        // Shift the chunk to the right.
+        chunk_source_offset = source_offset + old.size
+        chunk_source_offset_final = try (offsets[index + 1]! | @_size)
+        chunk_size = chunk_source_offset_final - chunk_source_offset
+        if chunk_size.is_nonzero (
+          chunk_dest_offset = dest_offset + new.size
+          @_ptr._offset(chunk_source_offset)._unsafe._copy_to(
+            @_ptr._offset(chunk_dest_offset)
+            chunk_size
+          )
+        )
+
+        // Copy the new string into its place, before the chunk.
+        if new.is_not_empty (
+          new._ptr._unsafe._copy_to(@_ptr._offset(dest_offset), new.size)
+        )
+      )
+      @_size += new_size_delta * offsets.size
+    )
+    @
+
   :fun non join(others Array(String)'box, separator = "") String'iso
     res = String.new_iso
     others.each_with_index -> (other, index |
       res << other
-      if (index != others.size - 1) (res << separator)
+      if index != others.size - 1 res << separator
     )
     --res
+
+  :: Return the index of the first non-whitespace character in the string,
+  :: starting from the given `start` index (zero if none given).
+  :: If the string is empty or contains only whitespace, returns the total size.
+  ::
+  :: Use this as an argument for a call to `trim` or `trim_in_place`
+  :: to help trim leading whitespace from the string.
+  :fun leading_whitespace_index(start USize = 0) USize
+    @each_byte_with_index(start) -> (byte, index |
+      if (byte > '\r' || byte < '\t') && byte != ' ' (
+        return index
+      )
+    )
+    @_size
+
+  :: Return the index just after the first non-whitespace character before
+  :: the end of the string (or the given `end` index, if given)
+  :: If the string is empty or contains only whitespace, returns zero.
+  ::
+  :: Use this as an argument for a call to `trim` or `trim_in_place`
+  :: to help trim trailing whitespace from the string.
+  :fun trailing_whitespace_index(end = USize.max_value) USize
+    @reverse_each_byte_with_index(end) -> (char, index |
+      if (char > '\r' || char < '\t') && char != ' ' (
+        return index + 1
+      )
+    )
+    0
 
 :: Encode the code point into UTF-8. It returns a tuple with the size of the
 :: encoded data and then the data.
